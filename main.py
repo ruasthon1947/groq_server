@@ -27,9 +27,14 @@ def detect(req: DetectRequest):
         raise HTTPException(status_code=500, detail="GROQ_API_KEY not set. Set GROQ_API_KEY in environment.")
 
     payload = {
-        "model": req.model,
-        "messages": [{"role": "user", "content": req.text}],
-    }
+    "model": "openai/gpt-oss-20b",
+    "input": [
+        {
+            "role": "user",
+            "content": req.text
+        }
+    ]
+}
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
         "Content-Type": "application/json",

@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import requests
 import os
 from dotenv import load_dotenv
-
+import json
 load_dotenv()
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
@@ -94,8 +94,7 @@ def detect(req: DetectRequest):
     except Exception:
         normalized["content"] = None
         normalized["suspicious"] = False
-
-    return output_text.strip()
+    return json.loads(output_text.strip())
 
 
 if __name__ == "__main__":

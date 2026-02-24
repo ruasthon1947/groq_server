@@ -45,7 +45,7 @@ def detect(req: DetectRequest):
             {"role": "system", "content": system_instruction},
             {"role": "user", "content": req.text}
         ],
-        "max_output_tokens": 40,      
+        "max_output_tokens": 60,      
         "temperature": 0,
         "top_p": 0.1,
         "reasoning": {"effort": "low"}  
@@ -95,7 +95,7 @@ def detect(req: DetectRequest):
         normalized["content"] = None
         normalized["suspicious"] = False
 
-    return normalized
+    return output_text.strip()
 
 
 if __name__ == "__main__":

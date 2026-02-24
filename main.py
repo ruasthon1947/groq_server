@@ -10,7 +10,7 @@ load_dotenv()
 # Set your Groq API key in the environment on Render
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 # Correct Groq chat completions endpoint
-GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
+GROQ_API_URL = "https://api.groq.com/v1/chat/completions"
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])

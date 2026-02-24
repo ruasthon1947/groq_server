@@ -7,10 +7,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-
-
 GROQ_API_URL = "https://api.groq.com/openai/v1/responses"
 
 app = FastAPI()
@@ -21,10 +18,9 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-
 class DetectRequest(BaseModel):
     text: str
-    model: str = "openai/gpt-oss-20b"  # keeping your model
+    model: str = "openai/gpt-oss-20b"
 
 
 @app.post("/detect")
@@ -35,35 +31,24 @@ def detect(req: DetectRequest):
             detail="GROQ_API_KEY not set. Set GROQ_API_KEY in environment."
         )
 
-
-    system_instruction = """
-You are a phishing detection AI.
-Return ONLY valid JSON.
-Do NOT explain.
-Format strictly:
-{
-  "risk_score": number (0-100),
-  "risk_level": "Low" | "Moderate" | "High",
-  "is_phishing": true | false,
-  "reason": "max 15 words"
-}
-"""
+    system_instruction = (
+        "You are a phishing detection AI. "
+        "Return ONLY valid JSON with keys: "
+        "risk_score (0-100), risk_level (Low|Moderate|High), "
+        "is_phishing (true|false), reason (max 12 words). "
+        "No explanation."
+    )
 
     payload = {
         "model": req.model,
         "input": [
-            {
-                "role": "system",
-                "content": system_instruction
-            },
-            {
-                "role": "user",
-                "content": req.text
-            }
+            {"role": "system", "content": system_instruction},
+            {"role": "user", "content": req.text}
         ],
-        "max_output_tokens": 120,   
-        "temperature": 0.2,         
-        "top_p": 0.1                
+        "max_output_tokens": 40,      
+        "temperature": 0,
+        "top_p": 0.1,
+        "reasoning": {"effort": "low"}  
     }
 
     headers = {
@@ -87,22 +72,21 @@ Format strictly:
     except Exception:
         data = {"raw": resp.text}
 
-    
     normalized = {"raw_response": data}
 
     try:
-        
         output_text = ""
-        if "output" in data and len(data["output"]) > 0:
+
+        if "output" in data:
             for item in data["output"]:
-                if "content" in item:
-                    for part in item["content"]:
+                if item.get("type") == "message":
+                    for part in item.get("content", []):
                         if part.get("type") == "output_text":
                             output_text += part.get("text", "")
 
         normalized["content"] = output_text.strip()
 
-        lc = (output_text or "").lower()
+        lc = output_text.lower()
         normalized["suspicious"] = any(
             k in lc for k in ["phish", "phishing", "malicious", "suspicious", "scam"]
         )

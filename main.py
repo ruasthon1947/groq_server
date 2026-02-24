@@ -7,41 +7,77 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Set your Groq API key in the environment on Render
+
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-# Correct Groq chat completions endpoint
+
+
 GROQ_API_URL = "https://api.groq.com/openai/v1/responses"
 
 app = FastAPI()
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
 
 
 class DetectRequest(BaseModel):
     text: str
-    model: str = "groq-1"
+    model: str = "openai/gpt-oss-20b"  # keeping your model
 
 
 @app.post("/detect")
 def detect(req: DetectRequest):
     if not GROQ_API_KEY:
-        raise HTTPException(status_code=500, detail="GROQ_API_KEY not set. Set GROQ_API_KEY in environment.")
+        raise HTTPException(
+            status_code=500,
+            detail="GROQ_API_KEY not set. Set GROQ_API_KEY in environment."
+        )
+
+
+    system_instruction = """
+You are a phishing detection AI.
+Return ONLY valid JSON.
+Do NOT explain.
+Format strictly:
+{
+  "risk_score": number (0-100),
+  "risk_level": "Low" | "Moderate" | "High",
+  "is_phishing": true | false,
+  "reason": "max 15 words"
+}
+"""
 
     payload = {
-    "model": "openai/gpt-oss-20b",
-    "input": [
-        {
-            "role": "user",
-            "content": req.text
-        }
-    ]
-}
+        "model": req.model,
+        "input": [
+            {
+                "role": "system",
+                "content": system_instruction
+            },
+            {
+                "role": "user",
+                "content": req.text
+            }
+        ],
+        "max_output_tokens": 120,   
+        "temperature": 0.2,         
+        "top_p": 0.1                
+    }
+
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
         "Content-Type": "application/json",
     }
 
     try:
-        resp = requests.post(GROQ_API_URL, json=payload, headers=headers, timeout=15)
+        resp = requests.post(
+            GROQ_API_URL,
+            json=payload,
+            headers=headers,
+            timeout=15
+        )
         resp.raise_for_status()
     except requests.RequestException as e:
         raise HTTPException(status_code=502, detail=str(e))
@@ -51,13 +87,26 @@ def detect(req: DetectRequest):
     except Exception:
         data = {"raw": resp.text}
 
-    # Normalize response: extract assistant content and a simple suspicious boolean
+    
     normalized = {"raw_response": data}
+
     try:
-        content = data.get("choices", [])[0].get("message", {}).get("content", "")
-        normalized["content"] = content
-        lc = (content or "").lower()
-        normalized["suspicious"] = any(k in lc for k in ["phish", "phishing", "malicious", "suspicious", "scam"])
+        
+        output_text = ""
+        if "output" in data and len(data["output"]) > 0:
+            for item in data["output"]:
+                if "content" in item:
+                    for part in item["content"]:
+                        if part.get("type") == "output_text":
+                            output_text += part.get("text", "")
+
+        normalized["content"] = output_text.strip()
+
+        lc = (output_text or "").lower()
+        normalized["suspicious"] = any(
+            k in lc for k in ["phish", "phishing", "malicious", "suspicious", "scam"]
+        )
+
     except Exception:
         normalized["content"] = None
         normalized["suspicious"] = False
